@@ -1,0 +1,81 @@
+[
+  {
+    "fault_id": "F001",
+    "equipment_id": "PUMP-07",
+    "equipment_type": "cooling_pump",
+    "criticality": "high",
+    "anomaly": {
+      "diagnosis": "bearing degradation",
+      "confidence": 0.94,
+      "severity": "critical",
+      "confidence_history": [0.89, 0.91, 0.92, 0.94]
+    },
+    "rule": {
+      "diagnosis": "vibration within configured tolerance",
+      "fault_code": "VIB-102",
+      "recommended_action": "continue_monitoring",
+      "rule_version": 12
+    },
+    "previous_similar_failures": 2
+  },
+
+  {
+    "fault_id": "F002",
+    "equipment_id": "FAN-03",
+    "equipment_type": "ventilation_fan",
+    "criticality": "low",
+    "anomaly": {
+      "diagnosis": "abnormal vibration",
+      "confidence": 0.91,
+      "severity": "high",
+      "confidence_history": [0.91, 0.32, 0.87, 0.29, 0.91]
+    },
+    "rule": {
+      "diagnosis": "known vibration during startup cycle",
+      "fault_code": "START-201",
+      "recommended_action": "continue_monitoring",
+      "rule_version": 8
+    },
+    "previous_similar_failures": 0
+  },
+
+  {
+    "fault_id": "F003",
+    "equipment_id": "MOTOR-11",
+    "equipment_type": "drive_motor",
+    "criticality": "medium",
+    "anomaly": {
+      "diagnosis": "possible rotor imbalance",
+      "confidence": 0.74,
+      "severity": "medium",
+      "confidence_history": [0.70, 0.72, 0.74, 0.73]
+    },
+    "rule": {
+      "diagnosis": "bearing lubrication required",
+      "fault_code": "LUBE-404",
+      "recommended_action": "scheduled_maintenance",
+      "rule_version": 15
+    },
+    "previous_similar_failures": 1
+  },
+
+  {
+    "fault_id": "F004",
+    "equipment_id": "COMPRESSOR-02",
+    "equipment_type": "air_compressor",
+    "criticality": "high",
+    "anomaly": {
+      "diagnosis": "novel pressure instability",
+      "confidence": 0.88,
+      "severity": "high",
+      "confidence_history": [0.84, 0.85, 0.87, 0.88]
+    },
+    "rule": {
+      "diagnosis": "no recognised fault condition",
+      "fault_code": null,
+      "recommended_action": "continue_monitoring",
+      "rule_version": 22
+    },
+    "previous_similar_failures": 0
+  }
+]
