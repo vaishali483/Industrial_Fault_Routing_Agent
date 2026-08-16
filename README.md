@@ -1,24 +1,24 @@
 # Industrial Fault Routing Agent
 
-An auditable decision agent for resolving conflicting industrial equipment diagnostics.
+An auditable agent that handles conflicting diagnostics from industrial equipment.
 
-The system receives competing assessments from:
+The system receives results from two sources:
 
-* an **ML anomaly detector**, which is sensitive to novel failure patterns but vulnerable to false positives and noisy sensor behaviour;
-* a **rule-based diagnostic engine**, which is precise for known faults but brittle when encountering novel conditions or stale rule updates.
+* **ML Anomaly Detector:** Good at finding unusual or new failure patterns, but can be affected by sensor noise and false positives.
+* **Rule-based Diagnostic Engine:** Reliable for known faults, but can miss new failure patterns or use outdated rule updates.
 
-For each fault, the agent evaluates the reliability of both sources, identifies their specific disagreement, selects an operational action, and produces an auditable explanation of the decision.
+For each fault, the agent compares both results, checks how reliable they are, finds the conflict, and chooses the safest action. It also records why that decision was made.
 
-## Supported Actions
+### Supported Actions
 
-The agent routes each alert to one of four outcomes:
+Each fault is routed to one of four actions:
 
 * **Immediate shutdown**
 * **Scheduled maintenance**
 * **Continue monitoring**
 * **Escalate to specialist**
 
-The decision policy deliberately does not always trust either diagnostic source.
+The agent does not always trust one diagnostic source over the other.
 
 ---
 
@@ -30,112 +30,84 @@ Run the interactive dashboard:
 streamlit run dashboard.py
 ```
 
-The dashboard provides three views:
+The dashboard has three views:
 
-1. **Fault Routing** — compare both diagnostic systems and process individual alerts.
-2. **Out-of-Sequence Rule Update** — demonstrate stale rule-version detection.
-3. **Audit Log** — inspect previously processed decisions.
+1. **Fault Routing:** Process individual fault alerts and compare both diagnostic systems.
+2. **Out-of-Sequence Rule Update:** Show how stale rule updates are detected.
+3. **Audit Log:** View past decisions and their results.
 
 ---
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    A[Fault Alert] --> B[Fault Routing Agent]
+<p align="center">
+<img src="docs/images/architecture.jpg" width="300"/>
+</p>
 
-    B --> C[Anomaly Diagnostic]
-    B --> D[Rule Diagnostic]
-
-    C --> E[Conflict Detection]
-    D --> E
-
-    E --> F[Anomaly Reliability Scoring]
-    E --> G[Rule Reliability Scoring]
-
-    F --> H[Decision Engine]
-    G --> H
-
-    H --> I{Routing Decision}
-
-    I --> J[Immediate Shutdown]
-    I --> K[Scheduled Maintenance]
-    I --> L[Continue Monitoring]
-    I --> M[Escalate to Specialist]
-
-    H --> N[Audit Logger]
-```
-
-The core routing logic is deterministic rather than LLM-based so that safety-related decisions remain reproducible, inspectable, and easy for a human operator to challenge.
+The main routing logic is deterministic instead of LLM-based. This keeps the decisions repeatable, easy to inspect, and easier for an operator to question.
 
 ---
 
 ## Decision Policy
 
-Each diagnostic source receives a context-dependent reliability score.
+Each diagnostic source gets a reliability score based on the current fault.
 
-### Anomaly detector
+### Anomaly Detector
 
-The anomaly detector begins with its model confidence.
+The anomaly detector starts with its confidence score.
 
-Its reliability is then adjusted using:
+| Criteria                       | Effect                            |
+| ------------------------------ | --------------------------------- |
+| High model confidence          | Supports the anomaly result       |
+| Stable confidence history      | Increases trust                   |
+| Oscillating confidence history | Reduces trust                     |
+| Previous similar failures      | Adds a reliability bonus          |
+| High equipment criticality     | Makes missed failures more costly |
 
-| Criterion                      | Effect                                                   |
-| ------------------------------ | -------------------------------------------------------- |
-| High model confidence          | Supports anomaly diagnosis                               |
-| Stable confidence history      | Supports anomaly reliability                             |
-| Oscillating confidence history | Significant reliability penalty                          |
-| Previous similar failures      | Reliability bonus                                        |
-| High equipment criticality     | Increases the consequence of ignoring credible anomalies |
+If the standard deviation of recent confidence values is above `0.20`, the signal is treated as unstable.
 
-A population standard deviation above `0.20` across recent confidence values is treated as unstable sensor behaviour.
+### Rule Engine
 
-### Rule engine
+The rule engine starts with a base reliability score.
 
-The rule engine begins with a baseline reliability score.
+| Criteria               | Effect                     |
+| ---------------------- | -------------------------- |
+| Known fault-code match | Increases trust            |
+| No matching fault rule | Reduces trust              |
+| Current rule version   | Increases trust            |
+| Stale rule version     | Removes decision authority |
 
-Its reliability is adjusted using:
+A stale rule gets a reliability score of `0.0`. If we already know the rule is outdated, it should not be able to override a newer diagnosis.
 
-| Criterion              | Effect                                   |
-| ---------------------- | ---------------------------------------- |
-| Known fault-code match | Reliability bonus                        |
-| No matching fault rule | Reliability penalty                      |
-| Current rule version   | Reliability bonus                        |
-| Stale rule version     | Verdict excluded from decision authority |
+### Uncertainty Handling
 
-A stale rule is assigned a reliability of `0.0` rather than merely receiving a small penalty because evidence known to be obsolete should not override a current diagnostic.
+The agent does not force a winner.
 
-### Uncertainty handling
+If the highest reliability score is below `0.60`, the fault is escalated.
 
-The system also avoids forcing a winner.
-
-If the strongest diagnostic has reliability below `0.60`, the alert is escalated.
-
-If the difference between the diagnostic scores is less than `0.15`, the evidence is treated as too close to safely distinguish and the alert is escalated to a specialist.
-
-This explicitly represents uncertainty instead of manufacturing confidence from a small numerical difference.
+If the difference between both scores is less than `0.15`, the evidence is too close to make a safe choice. The fault is then sent to a specialist.
 
 ---
 
 ## Required Failure Modes
 
-### 1. Noisy / oscillating anomaly confidence
+### 1. Noisy Anomaly Confidence
 
-An anomaly detector may currently report high confidence even when its recent predictions have behaved like:
+The anomaly detector may show high confidence even when recent readings are unstable.
+
+For example:
 
 ```text
 0.91 → 0.32 → 0.87 → 0.29 → 0.91
 ```
 
-The agent measures confidence stability across recent predictions.
+The agent checks the recent confidence history. If the values change too much, trust in the anomaly detector is reduced.
 
-Large oscillation reduces anomaly-detector reliability, allowing a well-supported rule-engine verdict to win instead.
+This can be seen in sample fault `F002`.
 
-This behaviour is demonstrated by sample fault `F002`.
+### 2. Out-of-Sequence Rule Updates
 
-### 2. Out-of-sequence rule updates
-
-Rule-engine updates may arrive in network order rather than version order.
+Rule updates may arrive in the wrong order.
 
 For example:
 
@@ -145,17 +117,17 @@ Rule version 12 arrives
 Rule version 10 arrives later
 ```
 
-The agent tracks the latest observed rule version for each equipment/fault-code pair.
+The agent keeps track of the latest rule version seen for each equipment and fault-code pair.
 
-Version `10` is therefore recognised as stale and is prevented from overriding version `12`.
+Since version `10` is older than version `12`, it is marked as stale and cannot override the newer result.
 
-The dashboard contains a dedicated **Out-of-Sequence Rule Update** demonstration for this scenario.
+This can also be tested from the **Out-of-Sequence Rule Update** page in the dashboard.
 
 ---
 
 ## Example Decisions
 
-### F001 — Critical bearing anomaly
+### F001: Critical Bearing Anomaly
 
 * Anomaly confidence: `0.94`
 * Confidence history: stable
@@ -163,45 +135,37 @@ The dashboard contains a dedicated **Out-of-Sequence Rule Update** demonstration
 * Previous similar failures: 2
 * Rule recommendation: continue monitoring
 
-Result:
-
 ```text
 Winner: Anomaly Detector
 Action: Immediate Shutdown
 ```
 
-### F002 — Noisy sensor behaviour
+### F002: Noisy Sensor Behaviour
 
 * Current anomaly confidence: `0.91`
-* Confidence history: highly unstable
+* Confidence history: unstable
 * Known rule match: startup vibration
-
-Result:
 
 ```text
 Winner: Rule Engine
 Action: Continue Monitoring
 ```
 
-### F003 — Ambiguous evidence
+### F003: Unclear Evidence
 
-* Anomaly reliability: approximately `0.79`
-* Rule reliability: approximately `0.80`
+* Anomaly reliability: about `0.79`
+* Rule reliability: about `0.80`
 
-The difference is below the configured winning margin.
-
-Result:
+The scores are too close to safely choose one source.
 
 ```text
 Winner: Neither
 Action: Escalate to Specialist
 ```
 
-### F006 — Known maintenance condition
+### F006: Known Maintenance Condition
 
-A weak anomaly competes against a recognised lubrication rule.
-
-Result:
+A weak anomaly is compared with a known lubrication rule.
 
 ```text
 Winner: Rule Engine
@@ -210,36 +174,34 @@ Action: Scheduled Maintenance
 
 ---
 
-## Auditability
+## Audit Logs
 
-Every processed fault is appended to:
+Every processed fault is saved to:
 
 ```text
 logs/decisions.jsonl
 ```
 
-Each record contains:
+Each record includes:
 
-* equipment metadata;
-* both diagnostic inputs;
-* detected conflicts;
-* anomaly and rule reliability scores;
-* decision criteria applied;
-* stale-rule status;
-* winning diagnostic;
-* final operational action;
-* human-readable reasoning.
+* equipment details
+* both diagnostic results
+* detected conflicts
+* reliability scores
+* criteria used
+* stale-rule status
+* winning diagnostic
+* final action
+* decision reasoning
 
-The JSONL format provides an append-only, machine-readable decision history that can be reviewed by an operator or consumed by downstream monitoring systems.
-
-Generated runtime logs are intentionally excluded from Git.
+This makes each decision easy to review later.
 
 ---
 
 ## Project Structure
 
 ```text
-industrial-fault-routing-agent/
+Industrial_Fault_Routing_Agent/
 │
 ├── app.py
 ├── dashboard.py
@@ -268,52 +230,38 @@ industrial-fault-routing-agent/
 
 ## Running Locally
 
-### 1. Clone the repository
+1. Clone the repository:
 
 ```bash
-git clone https://github.com/vaishali483/industrial-fault-routing-agent.git
-cd industrial-fault-routing-agent
+git clone https://github.com/vaishali483/Industrial_Fault_Routing_Agent.git
+cd Industrial_Fault_Routing_Agent
 ```
 
-### 2. Create a virtual environment
+2. Create a virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-Windows PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-macOS/Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-### 3. Install dependencies
+3. Activate it and install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run the CLI demonstration
+4. Run the CLI demo:
 
 ```bash
 python app.py
 ```
 
-### 5. Run the interactive dashboard
+5. Run the dashboard:
 
 ```bash
 streamlit run dashboard.py
 ```
 
----
-
-## Tests
+### Tests
 
 Run:
 
@@ -321,79 +269,71 @@ Run:
 python -m pytest -v
 ```
 
-The test suite covers:
+The tests cover:
 
-* high-confidence critical anomaly → shutdown;
-* noisy anomaly confidence → rule engine wins;
-* ambiguous reliability → specialist escalation;
-* known maintenance rule → scheduled maintenance;
-* stale/out-of-sequence rule update detection;
-* missing rule coverage for novel faults;
-* low-confidence evidence → no forced winner.
-
-Current suite:
-
-```text
-7 passed
-```
+* critical anomaly leading to shutdown
+* noisy anomaly confidence
+* specialist escalation when scores are too close
+* scheduled maintenance
+* stale rule updates
+* novel faults with no matching rule
+* low-confidence evidence
 
 ---
 
 ## Design Choices
 
-### Deterministic core decision logic
+### Deterministic Decision Logic
 
-I intentionally kept the operational decision deterministic rather than delegating routing to an LLM.
+I kept the main routing logic deterministic instead of using an LLM.
 
-For industrial fault handling, the same evidence should produce the same outcome, and every threshold should be visible and challengeable by an operator.
+For this type of system, the same input should give the same result. The thresholds and rules should also be easy for an operator to inspect.
 
-An LLM could be added later for operator-facing explanation or investigation assistance without making it the authority for safety-critical routing.
+An LLM could still be added later to help explain decisions in natural language, without letting it control the final routing action.
 
-### Stale rules are invalid evidence
+### Stale Rules Are Not Trusted
 
-Once the agent knows that a rule verdict is older than a previously observed version, it receives zero decision authority.
+If an older rule version arrives after a newer one, the agent marks it as stale and gives it a reliability score of `0.0`.
 
-This prevents network ordering issues from silently rolling equipment back to an obsolete diagnostic recommendation.
+This prevents an outdated rule from replacing a newer diagnosis.
 
-### Escalation is a valid outcome
+### Escalation Is a Valid Decision
 
-The system does not assume that one source must always win.
+The agent does not assume that one diagnostic system must always win.
 
-When neither diagnostic is sufficiently trustworthy, or their reliability scores are too close, the safe decision is to request specialist review.
+If both results are weak or too close, the fault is sent to a specialist instead.
 
 ---
 
 ## Assumptions and Limitations
 
-This project models the **routing layer between diagnostic systems** rather than implementing the anomaly model or industrial rule engine themselves.
+This project focuses on the **routing layer between two diagnostic systems**. It does not build the anomaly detector or industrial rule engine themselves.
 
-The diagnostics are supplied through structured sample alerts.
+The project uses structured sample alerts to represent their outputs.
 
-The reliability weights and thresholds are deliberately explicit engineering policy values for this assessment; in a production system they should be calibrated using historical fault outcomes, false-positive/false-negative costs, equipment-specific risk models, and operator feedback.
+The reliability scores and thresholds are fixed values chosen for this assessment. In a real system, they should be tuned using past fault data, equipment risk, false-positive costs, and operator feedback.
 
-Rule-version state is currently maintained in process memory. A production deployment would persist version state in a transactional datastore so that stale-update protection survives restarts and works across multiple agent instances.
+Rule-version state is also stored in memory. In production, this should be stored in a database so it survives restarts and works across multiple agent instances.
 
 ---
 
 ## What I Would Do Next
 
-With more time I would:
+With more time, I would:
 
-1. Calibrate reliability scores against labelled historical fault outcomes rather than hand-selected policy weights.
-2. Persist rule-version state and audit logs in a database.
-3. Introduce equipment-specific risk profiles and false-negative cost models.
-4. Add schema validation for malformed or incomplete diagnostic messages.
-5. Add concurrent-event and duplicate-message handling.
-6. Add operator acknowledgement and decision-override workflows.
-7. Track the eventual fault outcome so the system can measure which diagnostic source was correct over time.
-8. Add observability metrics for escalation rate, false shutdowns, stale updates, and diagnostic agreement.
-9. Add an optional LLM layer for natural-language operator summaries while keeping the routing policy deterministic.
+1. Tune the reliability scores using real historical fault data.
+2. Store rule versions and audit logs in a database.
+3. Add different risk settings for different types of equipment.
+4. Handle duplicate, missing, and malformed messages.
+5. Add an operator override and feedback flow.
+6. Track the final real-world outcome of each fault to measure which diagnostic was correct.
+7. Add an optional LLM layer for clearer operator summaries.
 
 ---
 
 ## Tech Stack
 
-* Python 3.12
+* Python
 * Streamlit
 * pytest
-* Python standard-library dataclasses, enums, statistics, JSON, and logging utilities
+* JSON and Python logging utilities
