@@ -77,5 +77,25 @@
       "rule_version": 22
     },
     "previous_similar_failures": 0
-  }
+  },
+  
+  {
+  "fault_id": "F006",
+  "equipment_id": "PUMP-12",
+  "equipment_type": "circulation_pump",
+  "criticality": "low",
+  "anomaly": {
+    "diagnosis": "minor vibration deviation",
+    "confidence": 0.48,
+    "severity": "low",
+    "confidence_history": [0.44, 0.45, 0.47, 0.48]
+  },
+  "rule": {
+    "diagnosis": "bearing lubrication interval exceeded",
+    "fault_code": "LUBE-510",
+    "recommended_action": "scheduled_maintenance",
+    "rule_version": 18
+  },
+  "previous_similar_failures": 0
+}
 ]
