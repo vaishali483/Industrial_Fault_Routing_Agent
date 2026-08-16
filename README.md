@@ -283,25 +283,17 @@ The tests cover:
 
 ## Design Choices
 
-### Deterministic Decision Logic
+#### Deterministic Decision Logic:
 
-I kept the main routing logic deterministic instead of using an LLM.
+I kept the main routing logic deterministic instead of using an LLM. For this type of system, the same input should give the same result. The thresholds and rules should also be easy for an operator to inspect. An LLM could still be added later to help explain decisions in natural language, without letting it control the final routing action.
 
-For this type of system, the same input should give the same result. The thresholds and rules should also be easy for an operator to inspect.
+#### Stale Rules Are Not Trusted:
 
-An LLM could still be added later to help explain decisions in natural language, without letting it control the final routing action.
+If an older rule version arrives after a newer one, the agent marks it as stale and gives it a reliability score of `0.0`. This prevents an outdated rule from replacing a newer diagnosis.
 
-### Stale Rules Are Not Trusted
+#### Escalation Is a Valid Decision:
 
-If an older rule version arrives after a newer one, the agent marks it as stale and gives it a reliability score of `0.0`.
-
-This prevents an outdated rule from replacing a newer diagnosis.
-
-### Escalation Is a Valid Decision
-
-The agent does not assume that one diagnostic system must always win.
-
-If both results are weak or too close, the fault is sent to a specialist instead.
+The agent does not assume that one diagnostic system must always win. If both results are weak or too close, the fault is sent to a specialist instead.
 
 ---
 
