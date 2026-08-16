@@ -52,6 +52,41 @@ def main():
         for reason in decision.reasons:
             print(f"- {reason}")
 
+    print("\n\n" + "#" * 70)
+    print("OUT-OF-SEQUENCE RULE UPDATE SCENARIO")
+    print("#" * 70)
+
+    rule_update_alerts = agent.load_alerts(
+        "data/rule_update_scenario.json"
+    )
+
+    for alert in rule_update_alerts:
+        decision = agent.process_alert(alert)
+
+        print("\n" + "=" * 70)
+        print(f"FAULT: {alert.fault_id}")
+        print(f"EQUIPMENT: {alert.equipment_id}")
+        print(f"RULE VERSION: {alert.rule.rule_version}")
+        print("=" * 70)
+
+        print(f"Rule stale: {decision.rule_stale}")
+        print(
+            f"Anomaly reliability: "
+            f"{decision.anomaly_reliability:.2f}"
+        )
+        print(
+            f"Rule reliability: "
+            f"{decision.rule_reliability:.2f}"
+        )
+
+        print(f"Winner: {decision.winner.value}")
+        print(f"Action: {decision.action.value}")
+
+        print("\nReasoning:")
+
+        for reason in decision.reasons:
+            print(f"- {reason}")
+
 
 if __name__ == "__main__":
     main()

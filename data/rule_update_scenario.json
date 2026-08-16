@@ -1,0 +1,40 @@
+[
+  {
+    "fault_id": "F005-A",
+    "equipment_id": "BOILER-04",
+    "equipment_type": "industrial_boiler",
+    "criticality": "high",
+    "anomaly": {
+      "diagnosis": "abnormal thermal rise",
+      "confidence": 0.89,
+      "severity": "high",
+      "confidence_history": [0.84, 0.86, 0.88, 0.89]
+    },
+    "rule": {
+      "diagnosis": "thermal control degradation",
+      "fault_code": "TEMP-301",
+      "recommended_action": "scheduled_maintenance",
+      "rule_version": 12
+    },
+    "previous_similar_failures": 1
+  },
+  {
+    "fault_id": "F005-B",
+    "equipment_id": "BOILER-04",
+    "equipment_type": "industrial_boiler",
+    "criticality": "high",
+    "anomaly": {
+      "diagnosis": "abnormal thermal rise",
+      "confidence": 0.89,
+      "severity": "high",
+      "confidence_history": [0.84, 0.86, 0.88, 0.89]
+    },
+    "rule": {
+      "diagnosis": "temperature fluctuation within tolerance",
+      "fault_code": "TEMP-301",
+      "recommended_action": "continue_monitoring",
+      "rule_version": 10
+    },
+    "previous_similar_failures": 1
+  }
+]

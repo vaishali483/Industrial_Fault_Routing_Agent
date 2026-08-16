@@ -14,6 +14,7 @@ from src.models import (
 HIGH_ANOMALY_CONFIDENCE = 0.85
 CONFIDENCE_OSCILLATION_THRESHOLD = 0.20
 CLEAR_WIN_MARGIN = 0.15
+MIN_TRUSTWORTHY_SCORE = 0.60
 
 
 class DecisionEngine:
@@ -108,8 +109,18 @@ class DecisionEngine:
         # ---------------------------------------------------------
 
         score_difference = abs(anomaly_score - rule_score)
+        highest_score = max(anomaly_score, rule_score)
 
-        if score_difference < CLEAR_WIN_MARGIN:
+        if highest_score < MIN_TRUSTWORTHY_SCORE:
+            winner = DiagnosticSource.NEITHER
+            action = Action.ESCALATE
+
+            reasons.append(
+                f"Neither diagnostic reaches the minimum trustworthy score "
+                f"of {MIN_TRUSTWORTHY_SCORE:.2f}; specialist review is required."
+            )
+
+        elif score_difference < CLEAR_WIN_MARGIN:
             winner = DiagnosticSource.NEITHER
             action = Action.ESCALATE
 
@@ -235,9 +246,13 @@ class DecisionEngine:
         criteria.append("rule_version_freshness")
 
         if stale:
-            score -= 0.60
-        else:
-            score += 0.05
+            reasons.append(
+                "The rule-engine verdict is stale and is excluded from "
+                "decision authority."
+            )
+            return 0.0
+
+        score += 0.05
 
         return self._clamp(score)
 
