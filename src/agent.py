@@ -10,13 +10,23 @@ from src.models import (
     Severity,
 )
 
+from src.audit_logger import AuditLogger
+
 
 class FaultRoutingAgent:
     def __init__(self):
         self.decision_engine = DecisionEngine()
+        self.audit_logger = AuditLogger()
 
     def process_alert(self, alert: FaultAlert):
-        return self.decision_engine.decide(alert)
+        decision = self.decision_engine.decide(alert)
+
+        self.audit_logger.log(
+            alert,
+            decision,
+        )
+
+        return decision
 
     def load_alerts(self, file_path: str):
         with open(file_path, "r", encoding="utf-8") as file:
