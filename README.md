@@ -41,7 +41,7 @@ The dashboard has three views:
 ## Architecture
 
 <p align="center">
-<img src="docs/images/architecture.jpg" width="300"/>
+<img src="docs/images/architecture.jpg"/>
 </p>
 
 The main routing logic is deterministic instead of LLM-based. This keeps the decisions repeatable, easy to inspect, and easier for an operator to question.
